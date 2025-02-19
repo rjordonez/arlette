@@ -1,0 +1,112 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-black text-gray-900;
+  }
+}
+
+.hero-section {
+  background-image: url('https://images.unsplash.com/photo-1501854140801-50d01698950b?auto=format&fit=crop&q=80');
+  background-size: cover;
+  background-position: center;
+  position: relative;
+}
+
+.hero-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.7));
+}
+
+.video-card {
+  background: #0a0a0a;
+  border-radius: 24px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.video-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.3), 0 8px 10px -6px rgb(0 0 0 / 0.3);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+.gm-style-iw {
+  background-color: #0a0a0a !important;
+  color: white !important;
+  padding: 0 !important;
+  border-radius: 1rem !important;
+  border: 1px solid #1a1a1a !important;
+}
+
+.gm-style-iw button[title="Close"] {
+  filter: invert(100%) !important;
+  top: 8px !important;
+  right: 8px !important;
+}
+
+.gm-style-iw-d {
+  overflow: hidden !important;
+}
+
+.gm-style-iw button {
+  color: white !important;
+}
+
+/* Ensure zoom controls stay within map bounds */
+.gm-control-active {
+  margin-bottom: 80px !important;
+}
+
+.custom-map-button {
+  position: absolute !important;
+  top: 1rem !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  z-index: 1000 !important;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0;
+}
+
+.custom-map-button > div {
+  background-color: #0a0a0a;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 500;
+  border: 1px solid #1a1a1a;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  transition: all 0.2s ease;
+  min-width: 120px;
+}
+
+.custom-map-button > div:hover {
+  background-color: #1a1a1a;
+  transform: translateY(-1px);
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+* {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
