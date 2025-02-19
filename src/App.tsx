@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Wind, Navigation2, Ruler, ChevronDown, ArrowRight } from 'lucide-react';
+import { Wind, Navigation2, Ruler, ChevronDown, ArrowRight, Mail, Linkedin, Egg, Database } from 'lucide-react';
 import { Map } from './components/Map';
 import BalloonCarousel from './components/BalloonCarousel';
+import { Link } from 'react-router-dom';
 
 interface FAQItem {
   question: string;
@@ -12,23 +13,27 @@ interface Industry {
   title: string;
   description: string;
   imageUrl: string;
+  link?: string;
 }
 
 const industries: Industry[] = [
   {
-    title: "Federal Government",
-    description: "Develop strategic plans for nationwide initiatives in climate resilience, emergency preparedness, and rural broadband access with detailed mapping data.",
-    imageUrl: "https://images.unsplash.com/photo-1569235186275-626cb53b83ce?auto=format&fit=crop&q=80"
+    title: "The Challenge",
+    description: "WindBorne Systems faces challenges in scaling its balloon network to achieve global coverage while ensuring long-duration flights without unexpected failures. Additionally, the company is focused on improving its AI-driven weather models to enhance forecast accuracy and compete with traditional meteorological methods.",
+    imageUrl: "https://images.unsplash.com/photo-1534088568595-a066f410bcda?auto=format&fit=crop&q=80",
+    link: "https://www.sfchronicle.com/weather/article/windborne-systems-weather-balloons-19954353.php?utm_source=chatgpt.com"
   },
   {
-    title: "Insurance",
-    description: "Accurately assess property risk, inform underwriting, and better manage claims with building-based geocodes and high-precision property intelligence.",
-    imageUrl: "https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&q=80"
+    title: "Latest Developments",
+    description: "Most weather balloons burst and fall to Earth as waste, with only 20% of instruments recovered. WindBorne Systems is changing this with reusable balloons that ascend and descend multiple times, cutting down on environmental impact.",
+    imageUrl: "https://images.unsplash.com/photo-1590055531615-f16d36ffe8ec?auto=format&fit=crop&q=80",
+    link: "https://windbornesystems.com/"
   },
   {
-    title: "Municipal & State Government",
-    description: "Improve transportation networks, public safety, and stormwater planning throughout your community with a virtual representation of infrastructure.",
-    imageUrl: "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?auto=format&fit=crop&q=80"
+    title: "System Architecture",
+    description: "Discover the algorithms behind weather balloon trajectory and how atmospheric conditions influence their paths. Learn to predict and optimize flight patterns using real-world data and computational models.",
+    imageUrl: "https://images.unsplash.com/photo-1551033406-611cf9a28f67?auto=format&fit=crop&q=80",
+    link: "/architecture"
   }
 ];
 
@@ -72,7 +77,7 @@ export default function App() {
     <div className="min-h-screen bg-black">
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 px-6 py-4 flex justify-between items-center bg-black/80 backdrop-blur-sm">
-        <div className="text-[#4ade80] text-2xl font-light">Weather Balloon Tracker</div>
+        <Link to="/" className="text-[#4ade80] text-2xl font-light">Arlette</Link>
       </nav>
 
       {/* Hero Section */}
@@ -80,11 +85,10 @@ export default function App() {
         <div className="container mx-auto px-6 relative z-10">
           <div className="max-w-3xl">
             <h1 className="text-[#4ade80] text-6xl font-light mb-6 leading-tight">
-              Track Weather Balloons in Real-Time
+              Space wont save you
             </h1>
             <p className="text-gray-200 text-xl mb-8 leading-relaxed">
-              Our advanced tracking system monitors high-altitude weather balloons across the United States,
-              providing real-time data for atmospheric research and weather forecasting.
+              The sky's big, but don't let your weather balloon get lost in it.
             </p>
             <a 
               href="#live-tracker"
@@ -153,7 +157,7 @@ export default function App() {
       <section className="py-24 px-6 bg-[#0a0a0a]">
         <div className="container mx-auto">
           <div className="mb-16">
-            <h2 className="text-6xl font-light text-gray-600 mb-4">Industries</h2>
+            <h2 className="text-6xl font-light text-gray-600 mb-4">Overview</h2>
           </div>
           <div className="space-y-8">
             {industries.map((industry, index) => (
@@ -163,9 +167,18 @@ export default function App() {
                 </div>
                 <div className="col-span-1">
                   <p className="text-gray-400 leading-relaxed mb-4">{industry.description}</p>
-                  <button className="bg-[#4ade80]/20 p-3 rounded-full hover:bg-[#4ade80]/30 transition-colors">
-                    <ArrowRight className="w-5 h-5 text-[#4ade80]" />
-                  </button>
+                  {industry.link ? (
+                    <Link 
+                      to={industry.link}
+                      className="inline-flex bg-[#4ade80]/20 p-3 rounded-full hover:bg-[#4ade80]/30 transition-colors"
+                    >
+                      <ArrowRight className="w-5 h-5 text-[#4ade80]" />
+                    </Link>
+                  ) : (
+                    <button className="bg-[#4ade80]/20 p-3 rounded-full hover:bg-[#4ade80]/30 transition-colors">
+                      <ArrowRight className="w-5 h-5 text-[#4ade80]" />
+                    </button>
+                  )}
                 </div>
                 <div className="col-span-1">
                   <img 
@@ -211,6 +224,59 @@ export default function App() {
           </div>
         </div>
       </section>
+
+      {/* Footer */}
+      <footer className="bg-black border-t border-gray-800 py-12">
+        <div className="container mx-auto px-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {/* Creators */}
+            <div>
+              <h3 className="text-[#4ade80] text-xl font-light mb-4">Creators</h3>
+              <div className="space-y-4">
+                <div>
+                  <p className="text-gray-400 font-medium">Tavasya</p>
+                  <div className="flex items-center gap-3 mt-2">
+                    <a href="mailto:tavasyag@gmail.com" className="text-gray-500 hover:text-[#4ade80] transition-colors">
+                      <Mail className="w-5 h-5" />
+                    </a>
+                    <a href="https://www.linkedin.com/in/tavasyaganpati/" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-[#4ade80] transition-colors">
+                      <Linkedin className="w-5 h-5" />
+                    </a>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-gray-400 font-medium">Rex</p>
+                  <div className="flex items-center gap-3 mt-2">
+                    <a href="mailto:rexjordonez@gmail.com" className="text-gray-500 hover:text-[#4ade80] transition-colors">
+                      <Mail className="w-5 h-5" />
+                    </a>
+                    <a href="https://www.linkedin.com/in/rex-ordonez/" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-[#4ade80] transition-colors">
+                      <Linkedin className="w-5 h-5" />
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Powered By */}
+            <div>
+              <h3 className="text-[#4ade80] text-xl font-light mb-4">Powered By</h3>
+              <p className="text-gray-400 font-medium">Windborne Systems</p>
+            </div>
+
+            {/* Easter Egg */}
+            <div>
+              <Link 
+                to="/game" 
+                className="group flex items-center gap-2 text-gray-500 hover:text-[#4ade80] transition-colors"
+              >
+                <Egg className="w-5 h-5" />
+                <span className="opacity-0 group-hover:opacity-100 transition-opacity">Find me</span>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
