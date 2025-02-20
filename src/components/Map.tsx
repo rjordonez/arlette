@@ -11,20 +11,32 @@ interface AnimationInfo {
   landingLocation: google.maps.LatLngLiteral | null;
 }
 
+interface ClusterInfo {
+  center: google.maps.LatLngLiteral;
+  count: number;
+  balloonIds: string[];
+}
+
+const CLUSTER_ZOOM_THRESHOLD = 6;
+const CLUSTER_PIXEL_DISTANCE = 50;
+
 export function Map() {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<google.maps.Map | null>(null);
   const markers = useRef<Record<string, google.maps.Marker>>({});
+  const clusters = useRef<Record<string, google.maps.Marker>>({});
   const trajectoryLines = useRef<Record<string, google.maps.Polyline>>({});
   const landingMarkers = useRef<Record<string, google.maps.Marker>>({});
   const streetViewService = useRef<google.maps.StreetViewService | null>(null);
   const panorama = useRef<google.maps.StreetViewPanorama | null>(null);
   const infoWindow = useRef<google.maps.InfoWindow | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const animationMarker = useRef<google.maps.Marker | null>(null);
   
   const [animationInfo, setAnimationInfo] = useState<AnimationInfo | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isStreetView, setIsStreetView] = useState(false);
+  const [currentClusters, setCurrentClusters] = useState<ClusterInfo[]>([]);
   
   const { 
     balloons, 
@@ -33,6 +45,21 @@ export function Map() {
     setSelectedBalloonId,
     setAnimatingBalloonId 
   } = useBalloonStore();
+
+  useEffect(() => {
+    if (selectedBalloonId && mapInstance.current) {
+      const selectedBalloon = balloons.find(b => b.id === selectedBalloonId);
+      if (selectedBalloon) {
+        mapInstance.current.setZoom(8);
+        mapInstance.current.panTo({
+          lat: selectedBalloon.latitude,
+          lng: selectedBalloon.longitude
+        });
+        
+        showBalloonInfo(selectedBalloon);
+      }
+    }
+  }, [selectedBalloonId]);
 
   const handleZoom = (zoomIn: boolean) => {
     if (mapInstance.current) {
@@ -167,6 +194,11 @@ export function Map() {
       
       if (nearestLocation && mapInstance.current && mapRef.current) {
         setIsStreetView(true);
+        
+        if (containerRef.current) {
+          containerRef.current.style.height = '100%';
+        }
+        
         panorama.current = new google.maps.StreetViewPanorama(
           mapRef.current,
           {
@@ -181,7 +213,6 @@ export function Map() {
         );
         mapInstance.current.setStreetView(panorama.current);
         
-        // Create and show custom back button
         const backButton = document.createElement('button');
         backButton.className = 'custom-map-button';
         backButton.innerHTML = `
@@ -207,7 +238,10 @@ export function Map() {
       panorama.current.setVisible(false);
       mapInstance.current.setStreetView(null);
       
-      // Remove custom back button
+      if (containerRef.current) {
+        containerRef.current.style.height = 'auto';
+      }
+      
       const backButton = mapRef.current?.querySelector('.custom-map-button');
       if (backButton) {
         backButton.remove();
@@ -217,6 +251,10 @@ export function Map() {
 
   const animateBalloonPop = async (balloon: any) => {
     if (!mapInstance.current) return;
+
+    if (animationMarker.current) {
+      animationMarker.current.setMap(null);
+    }
 
     const startPosition = { lat: balloon.latitude, lng: balloon.longitude };
     const landingPoint = calculateLandingPoint(balloon);
@@ -233,7 +271,7 @@ export function Map() {
       infoWindow.current = new google.maps.InfoWindow();
     }
 
-    const animationMarker = new google.maps.Marker({
+    animationMarker.current = new google.maps.Marker({
       position: startPosition,
       map: mapInstance.current,
       icon: {
@@ -245,6 +283,16 @@ export function Map() {
         strokeColor: '#fff',
       },
     });
+
+    if (markers.current[balloon.id]) {
+      markers.current[balloon.id].setMap(null);
+    }
+    if (trajectoryLines.current[balloon.id]) {
+      trajectoryLines.current[balloon.id].setMap(null);
+    }
+    if (landingMarkers.current[balloon.id]) {
+      landingMarkers.current[balloon.id].setMap(null);
+    }
 
     const updateInfoWindow = (position: google.maps.LatLngLiteral, metrics: any) => {
       const content = `
@@ -308,7 +356,6 @@ export function Map() {
       infoWindow.current!.open(mapInstance.current!);
     };
 
-    // Add global function for the view button
     (window as any).viewLandingLocation = (lat: number, lng: number, direction: number) => {
       showStreetView({ lat, lng }, direction);
     };
@@ -340,16 +387,175 @@ export function Map() {
       updateInfoWindow(currentPosition, metrics);
       
       await new Promise(resolve => setTimeout(resolve, stepDuration));
-      animationMarker.setPosition(currentPosition);
+      if (animationMarker.current) {
+        animationMarker.current.setPosition(currentPosition);
+      }
       
       if (mapInstance.current) {
         mapInstance.current.panTo(currentPosition);
       }
     }
 
-    animationMarker.setMap(null);
+    if (animationMarker.current) {
+      animationMarker.current.setMap(null);
+    }
     setAnimationInfo(null);
     setAnimatingBalloonId(null);
+  };
+
+  const calculateClusters = () => {
+    if (!mapInstance.current) return [];
+
+    const zoom = mapInstance.current.getZoom();
+    if (zoom >= CLUSTER_ZOOM_THRESHOLD) {
+      return [];
+    }
+
+    const clusters: ClusterInfo[] = [];
+    const processed = new Set<string>();
+
+    balloons.forEach((balloon) => {
+      if (processed.has(balloon.id)) return;
+
+      const cluster: ClusterInfo = {
+        center: { lat: balloon.latitude, lng: balloon.longitude },
+        count: 1,
+        balloonIds: [balloon.id]
+      };
+
+      balloons.forEach((otherBalloon) => {
+        if (otherBalloon.id === balloon.id || processed.has(otherBalloon.id)) return;
+
+        const point1 = mapInstance.current!.getProjection()?.fromLatLngToPoint(
+          new google.maps.LatLng(balloon.latitude, balloon.longitude)
+        );
+        const point2 = mapInstance.current!.getProjection()?.fromLatLngToPoint(
+          new google.maps.LatLng(otherBalloon.latitude, otherBalloon.longitude)
+        );
+
+        if (point1 && point2) {
+          const pixelDistance = Math.sqrt(
+            Math.pow((point1.x - point2.x) * Math.pow(2, zoom), 2) +
+            Math.pow((point1.y - point2.y) * Math.pow(2, zoom), 2)
+          );
+
+          if (pixelDistance < CLUSTER_PIXEL_DISTANCE) {
+            cluster.count++;
+            cluster.balloonIds.push(otherBalloon.id);
+            processed.add(otherBalloon.id);
+
+            cluster.center.lat = (cluster.center.lat * (cluster.count - 1) + otherBalloon.latitude) / cluster.count;
+            cluster.center.lng = (cluster.center.lng * (cluster.count - 1) + otherBalloon.longitude) / cluster.count;
+          }
+        }
+      });
+
+      clusters.push(cluster);
+      processed.add(balloon.id);
+    });
+
+    return clusters;
+  };
+
+  const updateMarkers = () => {
+    if (!mapInstance.current) return;
+
+    const zoom = mapInstance.current.getZoom();
+    const newClusters = calculateClusters();
+    setCurrentClusters(newClusters);
+
+    Object.values(markers.current).forEach(marker => marker.setMap(null));
+    Object.values(clusters.current).forEach(marker => marker.setMap(null));
+    Object.values(trajectoryLines.current).forEach(line => line.setMap(null));
+    Object.values(landingMarkers.current).forEach(marker => marker.setMap(null));
+
+    markers.current = {};
+    clusters.current = {};
+    trajectoryLines.current = {};
+    landingMarkers.current = {};
+
+    if (zoom >= CLUSTER_ZOOM_THRESHOLD) {
+      balloons.forEach((balloon) => {
+        const position = { lat: balloon.latitude, lng: balloon.longitude };
+        const landingPoint = calculateLandingPoint(balloon);
+
+        markers.current[balloon.id] = new google.maps.Marker({
+          position,
+          map: mapInstance.current,
+          title: balloon.name,
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 12,
+            fillColor: selectedBalloonId === balloon.id ? '#22c55e' : '#3b82f6',
+            fillOpacity: 0.9,
+            strokeWeight: 2,
+            strokeColor: '#fff',
+          },
+        });
+
+        markers.current[balloon.id].addListener('click', () => {
+          setSelectedBalloonId(balloon.id);
+          showBalloonInfo(balloon);
+        });
+
+        trajectoryLines.current[balloon.id] = new google.maps.Polyline({
+          path: [position, landingPoint],
+          geodesic: true,
+          strokeColor: '#ef4444',
+          strokeOpacity: 0.5,
+          strokeWeight: 2,
+          map: mapInstance.current,
+        });
+
+        landingMarkers.current[balloon.id] = new google.maps.Marker({
+          position: landingPoint,
+          map: mapInstance.current,
+          icon: {
+            path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+            scale: 6,
+            fillColor: '#ef4444',
+            fillOpacity: 0.9,
+            strokeWeight: 2,
+            strokeColor: '#fff',
+            rotation: balloon.direction,
+          },
+        });
+      });
+    } else {
+      newClusters.forEach((cluster, index) => {
+        const intensity = Math.min(0.3 + (cluster.count / balloons.length) * 0.7, 1);
+        const greenComponent = Math.floor(34 * (1 - intensity));
+        const clusterColor = `rgb(${greenComponent}, 173, 128)`;
+
+        const isSelectedInCluster = selectedBalloonId && cluster.balloonIds.includes(selectedBalloonId);
+
+        clusters.current[`cluster-${index}`] = new google.maps.Marker({
+          position: cluster.center,
+          map: mapInstance.current,
+          label: {
+            text: cluster.count.toString(),
+            color: '#ffffff',
+            fontSize: '14px',
+            fontWeight: 'bold',
+          },
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 20 + Math.min(cluster.count * 2, 20),
+            fillColor: isSelectedInCluster ? '#22c55e' : clusterColor,
+            fillOpacity: 0.9,
+            strokeWeight: 2,
+            strokeColor: '#ffffff',
+          },
+        });
+
+        clusters.current[`cluster-${index}`].addListener('click', () => {
+          if (mapInstance.current) {
+            mapInstance.current.setZoom(CLUSTER_ZOOM_THRESHOLD);
+            mapInstance.current.panTo(cluster.center);
+          }
+        });
+      });
+    }
   };
 
   useEffect(() => {
@@ -382,14 +588,15 @@ export function Map() {
         streetViewService.current = new google.maps.StreetViewService();
         infoWindow.current = new google.maps.InfoWindow();
 
-        // Show initial balloon info
+        mapInstance.current.addListener('zoom_changed', updateMarkers);
+        mapInstance.current.addListener('idle', updateMarkers);
+
         const firstBalloon = balloons[0];
         if (firstBalloon) {
           setSelectedBalloonId(firstBalloon.id);
           showBalloonInfo(firstBalloon);
         }
 
-        // Add global function for the pop balloon button
         (window as any).startBalloonAnimation = (balloonId: string) => {
           setAnimatingBalloonId(balloonId);
           if (infoWindow.current) {
@@ -401,95 +608,8 @@ export function Map() {
   }, []);
 
   useEffect(() => {
-    if (!mapInstance.current) return;
-
-    balloons.forEach((balloon) => {
-      const position = { lat: balloon.latitude, lng: balloon.longitude };
-      const landingPoint = calculateLandingPoint(balloon);
-      
-      if (!markers.current[balloon.id]) {
-        markers.current[balloon.id] = new google.maps.Marker({
-          position,
-          map: mapInstance.current,
-          title: balloon.name,
-          icon: {
-            path: google.maps.SymbolPath.CIRCLE,
-            scale: 12,
-            fillColor: selectedBalloonId === balloon.id ? '#22c55e' : '#3b82f6',
-            fillOpacity: 0.9,
-            strokeWeight: 2,
-            strokeColor: '#fff',
-          },
-        });
-
-        markers.current[balloon.id].addListener('click', () => {
-          setSelectedBalloonId(balloon.id);
-          showBalloonInfo(balloon);
-          if (mapInstance.current) {
-            mapInstance.current.panTo(position);
-            mapInstance.current.setZoom(6);
-          }
-        });
-      } else {
-        markers.current[balloon.id].setPosition(position);
-        markers.current[balloon.id].setIcon({
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 12,
-          fillColor: selectedBalloonId === balloon.id ? '#22c55e' : '#3b82f6',
-          fillOpacity: 0.9,
-          strokeWeight: 2,
-          strokeColor: '#fff',
-        });
-      }
-
-      if (!landingMarkers.current[balloon.id]) {
-        landingMarkers.current[balloon.id] = new google.maps.Marker({
-          position: landingPoint,
-          map: mapInstance.current,
-          title: `${balloon.name} Landing Point`,
-          icon: {
-            path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
-            scale: 6,
-            fillColor: '#ef4444',
-            fillOpacity: 0.9,
-            strokeWeight: 2,
-            strokeColor: '#fff',
-            rotation: balloon.direction,
-          },
-        });
-
-        trajectoryLines.current[balloon.id] = new google.maps.Polyline({
-          path: [position, landingPoint],
-          geodesic: true,
-          strokeColor: '#ef4444',
-          strokeOpacity: 0.5,
-          strokeWeight: 2,
-          map: mapInstance.current,
-        });
-      } else {
-        landingMarkers.current[balloon.id].setPosition(landingPoint);
-        landingMarkers.current[balloon.id].setIcon({
-          path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
-          scale: 6,
-          fillColor: '#ef4444',
-          fillOpacity: 0.9,
-          strokeWeight: 2,
-          strokeColor: '#fff',
-          rotation: balloon.direction,
-        });
-        trajectoryLines.current[balloon.id].setPath([position, landingPoint]);
-      }
-    });
-
-    if (selectedBalloonId) {
-      const selectedBalloon = balloons.find(b => b.id === selectedBalloonId);
-      if (selectedBalloon && mapInstance.current) {
-        mapInstance.current.panTo({ 
-          lat: selectedBalloon.latitude, 
-          lng: selectedBalloon.longitude 
-        });
-        mapInstance.current.setZoom(6);
-      }
+    if (mapInstance.current) {
+      updateMarkers();
     }
   }, [balloons, selectedBalloonId]);
 
@@ -497,6 +617,10 @@ export function Map() {
     if (animatingBalloonId) {
       const balloon = balloons.find(b => b.id === animatingBalloonId);
       if (balloon) {
+        if (mapInstance.current) {
+          mapInstance.current.setZoom(8);
+          mapInstance.current.panTo({ lat: balloon.latitude, lng: balloon.longitude });
+        }
         animateBalloonPop(balloon);
       }
     }
@@ -504,7 +628,10 @@ export function Map() {
 
   return (
     <div ref={containerRef} className="relative w-full h-full">
-      <div ref={mapRef} className="w-full h-[calc(100vh-11rem)] rounded-lg overflow-hidden" />
+      <div 
+        ref={mapRef} 
+        className={`w-full ${isStreetView ? 'h-[calc(100vh-4rem)]' : 'h-[calc(100vh-11rem)]'} rounded-lg overflow-hidden`}
+      />
       {!isStreetView && (
         <>
           <button
